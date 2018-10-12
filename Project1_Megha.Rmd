@@ -1,0 +1,294 @@
+---
+title: "MA589 Project 1"
+author: "Megha Pandit"
+date: "September 26, 2018"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+1. (WaRming up) Write (R) functions that return:
+(a) The inverse or the transpose inverse of an upper triangular matrix. Call this function inv.upper.tri and provide a transpose argument to specify if the transpose is requested. Hint: use backsolve.
+
+```{r}
+inv.upper.tri<-function(A = matrix, v = matrix, transpose){
+  backsolve(r = A,x = v,transpose = transpose)
+}
+```
+
+(b)Quick check: if u <- 1e200 * rep(1, 100), what is norm2(u)?
+
+**_If we directly do a crossprod() on u, we get Inf as the answer, since 1e200 is a large value. Therefore, we can multiply and divide the each element of the vector u by the maximum value in the vector and then find the norm2 of u._**
+
+```{r}
+u <- 1e200*rep(1,100)
+norm2 <- function(v){
+  max_v <- max(abs(v))
+  sqrt(crossprod(v/max(v), v/max(v)))*max(v)
+}
+norm2(u)
+
+```
+
+(c) The column-normalization U of matrix A, $U_{ij} = A_{ij}/||A_j||$ (call this function normalize.cols, and feel free to use norm2 above).
+
+```{r}
+A <- matrix(1:20, 5, 4)
+normalize.cols <- function(A){
+  U <- matrix(0, nrow = dim(A)[1], ncol = dim(A)[2])
+  for (i in 1:dim(A)[1]){
+    for (j in 1:dim(A)[2]) {
+      U[i,j] <- A[i,j]/norm2(A[,j]) #using the norm2 function from part (b)
+    }
+  }
+  U
+}
+normalize.cols(A)
+```
+
+(d) Quick check: what is proj(1:100, u), u as in (b) above?
+
+**_For very large values_** $proj_u(a)=\frac{u^Ta}{\lVert u \rVert ^2}u$ **_tends to zero as_** ${\lVert u \rVert ^2}$ **_tends to infinity. Therefore, we can split the expression as_** $proj_u(a)=\frac{u^Ta}{\lVert u \rVert}\frac{u}{\lVert u \rVert}$.
+
+```{r}
+a <- 1:100
+u <- 1e200 * rep(1, 100)
+proj_1 <- function(a, u) {
+  (drop(crossprod(u, a)) / drop(norm2(u))) * (u / drop(norm2(u)))
+}
+proj_1(a = a, u = u)
+```
+
+(e) The Vandermonde matrix of vector $a = [a_i]_{i=1,...,n}$ and degree d
+
+```{r}
+
+vander_monde <- function(a,d){
+  V <- matrix(0, nrow = length(a), ncol = d+1)
+  for (j in 1:(d+1)){
+    for (i in 1:length(a)){
+      V[i,j] <- a[i]^(j-1)
+    }
+  }
+  V
+}
+c <- rep(1:4)
+vander_monde(c,4)
+```
+
+2. The machine epsilon, $\epsilon$, can be defined as the smallest floating point (with base 2) such that $1 + \epsilon > 1$, that is, $1 + \epsilon/2 == 1$ in machine precision.
+
+(a) Write a function that returns this value by starting at eps = 1 and iteratively dividing by 2 until the definition is satisfied.
+
+```{r}
+machine_ep <- function(eps){
+  while (1 + (eps/2) !=1) {
+    eps <- eps/2
+  }
+  eps
+}
+machine_ep(1)
+```
+
+(b) Write a function that computes f(x) = log(1 + exp(x)) and then evaluate: f(0), f(???80), f(80), and f(800).
+
+```{r}
+fun_x <- function(x){
+  log(1 + exp(x))
+}
+fun_x(0)
+fun_x(-80)
+fun_x(80)
+fun_x(800)
+```
+**_Since exp(-80) is a very small number almost equal to 0, log(1+0) = log(1) = 0, Hence, fun_x(-80) is zero. Similarly, since exp(800) is a very large number tending to infinity, fun_x(800) yields Inf as the answer._**
+
+(c) How would you specify your function to avoid computations if $x << 0$ (x < 0 and
+|x| is large)? (Hint: $\epsilon$.)
+
+**_Since machine epsilon is defined as the smallest floating point, for any x < epsilon/2, we can have f(x)=0_**
+```{r}
+fun_small <- function(x1){
+  if(exp(x1) > machine_ep(x1)/2){
+    log(1 + exp(x1))
+  }
+  else{
+    log(1)
+  }
+}
+fun_small(-80)
+```
+
+(d) How would you implement your function to not overflow if $x >> 0$ ?
+
+**_To avoid computations when x >>0, we consider the smallest value of x for which log(1 + exp(x)) = log(exp(x)). We define s be such that log(1 + exp(s)) = log(exp(s)). If x > s, then we just return x without calculating f(x)._**
+
+```{r}
+fun_large <- function(x){
+  s<- 1
+  while(exp(s) != exp(s)+1){
+    s = s+1
+  }
+  s
+  if(x < s){
+    fun_x(x)
+  }else{
+    x
+  }
+}
+fun_large(800)
+```
+
+3.(a)Show that $C = Q^TA$ is upper triangular and that C is the Cholesky factor of $A^TA$.
+
+**_If A is a positive definite matrix, then we can find an upper triangular matrix C such that_** $A = C^TC$. **_This process is called Cholesky Decomposition. _**
+**_Applying QR Decomposition on A, we have $A = QR$ where Q is an orthogonal matrix and R is an upper triangular matrix. Given_** $C = Q^TA$, **_Q is an orthogonal matrix and hence_** $Q^{-1} = Q^T$.
+$$C = Q^TA = Q^{-1}A$$
+$$C = Q^{-1}QR = R$$
+**_Since R is an upper triangular matrix and C = R, C is an upper triangular matrix._**
+**_To show that C is the Cholesky factor of_** $A^TA$, **_we need to show that_** $A^TA = C^TC$
+**_We have_** $C = Q^TA$. 
+$$C^TC = (Q^TA)^T(Q^TA)$$
+$$C^TC = A^TQQ^TA = A^TQQ^{-1}A = A^TIA = A^TA$$
+**_Therefore,_** $A^TA = C^TC$ **_and C is the Cholesky factor of_** $A^TA$.
+
+3.(b) Write a R function that computes the Q orthogonal factor of a Vandermonde matrix with base vector x and degree d without computing the Vandermonde matrix explicitly, that is, as your function iterates to compute $u_i$, compute and use the columns of the Vandermonde matrix on the fly.
+
+```{r}
+
+q_fun <- function(a,d){
+  U <- matrix(nrow = length(a), ncol = d+1)
+  e <- rep(1,d+1)  
+  x <- rep(0,d+1)  
+  U[,1] <- rep(1, length(a))
+  e[2] <- crossprod(U[,1],U[,1])
+  for (i in 2:(d+1)){
+        sum_proj <- 0
+    U[,i] <- a^(i-1)
+    for (j in 1:(i-1)){
+      proj_u <- proj_1(U[,i],U[,j])
+      sum_proj <- sum_proj + proj_u
+    }
+    U[,i] <- U[,i] - sum_proj
+    e[i+1] <- drop(crossprod(U[,i],U[,i]))    #Calculating eta for part (c)
+    x[i] <- t(U[,i])%*% diag(a) %*%U[,i]/(drop(crossprod(U[,i],U[,i])))   # Calculating alpha for part(c)
+  }
+  Q <- normalize.cols(U)
+  return (list(Q,e,x))
+}
+a <- c(1,2,3)
+d <- 3
+Q_ortho <- q_fun(a,d)
+Q_ortho
+#For part(c) of the question
+q <- Q_ortho[[1]]
+e <- Q_ortho[[2]]
+x <- Q_ortho[[3]]
+```
+
+3.(c) Write a R function that, given ?? and ??, computes Q.
+
+```{r, echo=TRUE}
+x
+q_comp <- function ( e = vector , x = vector ,  a = vector ){
+  Q <-  matrix(0, nrow = length(a), ncol = d+1 )
+  Q[,1] <- 1
+  Q[,2] <- a - x[1]*rep(1,length(a))
+  for ( i in 2:d){
+    for ( j in 1:length(a)){
+      Q[j,i+1] <- ((a[j] - x[i]) * Q[j,i])- (e[i+1]/e[i] * Q[j,i-1]) #algorithm from the question
+    }
+  }
+  return(Q)
+}
+
+Q <- q_comp(e,x,a) 
+Q_new <- normalize.cols(Q)
+Q_new
+```
+
+3.(d) 
+
+```{r}
+#Alpha1 is the mean of vector a 
+x[1] == mean(a)
+#Eta2 is the number of vectors in vector a 
+e[2] == length(a)
+#Eta3 gives the value of (n-1)*Var(a) 
+e[3] == (length(a) -1 )*var(a)
+```
+
+4. (a) To prove that $H_0: \beta_j = \beta_{j+1} = ... = \beta_p = 0$ is equivalent to testing $\gamma_j = ... = \gamma_p = 0$, where $\gamma = R\beta$
+
+**_Since X has thin QR Decomposition,_** $X = QR$, 
+$$\beta = (X^TX)^{-1}X^Ty = [(QR)^TQR]^{-1}(QR)^Ty$$
+$$\beta = [R^TQ^TQR]^{-1}R^TQ^Ty$$
+**_Since Q is an orthogonal matrix,_** $Q^TQ = I$
+$$\beta = (R^TR)^{-1}R^TQ^Ty = R^{-1}R^{-T}R^TQ^Ty = R^{-1}Q^Ty$$
+**_Therefore,_** $$R\beta = Q^Ty = (Q^TQ)^{-1}Q^Ty$$
+**_Since_** $\gamma = R\beta$, $$\gamma = Q^Ty$$, $H_0$ **_is equivalent to testing_** $\gamma_j = ... = \gamma_p = 0$
+**_Hence,_** $y = Q\gamma$ **_and y can be regressed on Q instead of X._**
+**_And,_**
+$$Var(\gamma) = Var(Q^Ty) = E((Q^Ty)(Q^Ty)^T) = Q^TE(Y^TY)Q = \sigma^2I_nQ^TQ = \sigma^2I_n$$
+
+4.(b) Show that the ML estimator for $\gamma$ is $\hat{\gamma} = Q^Ty$ and the components of $\hat{\gamma}$ are independent.
+
+**_Since_** $y ~ N(Q\gamma, \sigma^2I_n)$, $y = \frac{1}{\sqrt{2\pi\sigma^2}}e^{\frac{-1}{2\sigma^2}(y - Q\gamma)^2}$
+**_So,_** $y = (constant)e^{-(y - Q\gamma)^2} = (constant)e^{-(y - Q\gamma)^T(y - Q\gamma)}$
+**_To maximize the expectation, we need to minimize_** $f = (y-Q\gamma)^T(y-Q\gamma)$
+**_Equating_** $\frac{\partial f}{\partial \gamma}$ **_to zero, we get_**
+$$\frac{\partial (y^Ty - 2Q^Ty\gamma + (Q\gamma)^T(Q\gamma))}{\partial \gamma} = 0,   \:\:\: i.e., \:\: -2Q^Ty + 2\hat\gamma = 0$$
+**_Therefore,_** $$\hat\gamma = Q^Ty$$
+**_In order to prove that the components of_** $\hat\gamma$ **_are independent, we can show that the covariance or the non-diagonal terms of the_** $Cov[\hat\gamma]$ **_are zero._**
+$$cov[\hat\gamma] = cov[Q^Ty] = E((Q^Ty)(Q^Ty)^T) = E[Q^Tyy^TQ]$$
+$$cov[\hat\gamma] = Q^TE(yy^T)Q = Q^T\sigma^2I_nQ = \sigma^2I_n$$
+$\sigma^2I_n$ **_matrix has its non-diagonal elements equal to zero, and hence, the components of_** $\hat\gamma$ **_are independent_**
+
+4.(c)Using R, explain how you compute: (i) the ML estimate $\hat??$ as a function of $\hat??$, and (ii) the correlation matrix of $\hat??$ using only crossprod, normalize.cols, and inv.upper.tri.
+
+**_Since_** $\gamma = R\beta$, $$\hat \beta = R^{-1}\hat\gamma$$
+**_In R, we can use the inv.upper.tri function that we defined in question 1._**
+**_#b = beta hat and g = gamma vector and R is the upper triangular matrix_**
+**_b <- inv.upper.tri(R, g, transpose = FALSE)_**
+
+**_In R,_**
+$$cor(\hat\beta) = crossprod(normalized.cols(\hat\beta),normalized.cols(\hat\beta)) $$
+$$cor(\hat\beta) = crossprod(normalized.cols(inv.upper.tri(R, \hat\gamma),normalized.cols(inv.upper.tri(R, \hat\gamma)) $$
+
+4.(d)(i) Compute Q using the routine from 3.b, obtain $\hat{\gamma} = Q^Ty$ and compare it to the estimate from coef(lm(dist ~ Q - 1)). 
+
+```{r}
+data(cars)
+y <- as.vector(cars$dist)
+Q_cars <- q_fun(as.vector(cars$speed), 3)[[1]]
+gamma <- crossprod(Q_cars, y) #estimate of gamma as crossprod of Q and y
+gamma
+gamma1 <- coef(lm(cars$dist ~ Q_cars -1))
+gamma1
+```
+
+4.(d)(ii) Compute $\hat{\beta}$ according to (c) and compare it to the estimate from coef(lm(dist ~ vandermonde(speed, 3) - 1))
+
+```{r }
+data(cars)
+V <-(vander_monde(cars$speed, 3))
+colnames(V) <- c("cars1","cars2","cars3","cars4")
+
+Q <- q_fun(cars$speed, 3)
+q_cars <- Q[[1]]
+G <- crossprod(q_cars,cars$dist)
+G
+coef(lm(cars$dist~ q_cars))
+
+beta1 <- coef(lm(cars$dist ~ V - 1))
+beta1
+
+qr <- qr(vander_monde(cars$speed,3))
+R <- qr.R(qr)
+R
+In <- diag( rep(1,ncol(R)) )
+crossprod(inv.upper.tri( R, In , TRUE), G)
+
+```

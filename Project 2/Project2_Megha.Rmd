@@ -1,0 +1,199 @@
+---
+title: "MA589 - Computational Statistics Project 2"
+author: "Megha Pandit"
+date: "October 9, 2018"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+1.(a) Explain why horner works; start by understanding how a small polynomial, say c(3, -2, 1), is evaluated, and then provide a mathematical expression that summarizes how the computations are performed.
+```{r}
+horner <- function (coef)
+function (x) {
+s <- 0
+for (i in seq(length(coef), 1, -1)){
+s <- s * x + coef[i]
+}
+s
+}
+coef <- c(3,-2,1)
+x <- 3
+horner(coef)(x)
+```
+
+**_Evaluating the polynomial c(3,-2,1) at x = 3, the above function computes it iteratively for i = 3,2 and 1, as_** $s_2 = s_2x + coef_3$, $s_1 = s_1x + coef_2$ **_and_** $s_0 = s_0x + coef_1$. **_Mathematically, if_** $p(x)$ **_is a polynomial_** $p(x) = b_0 + b_1x + b_2x^2 + b_3x^3 + ... + b_nx^n$, **_then, we can evaluate_** $p(x)$ **_at_** $x = x_0$ **_as follows:_**
+**_We can write the polynomial as_** 
+$$p(x_0) = b_0 + x_0(b_1 + x_0(b_2 + x_0(....x_0(b_{n-1} + b_nx_0))))$$
+**_We can define constants_** $s_n, s_{n-1},...$ **_such that_** 
+$$s_n = s_nx_0 + b_n$$
+**_Since we are starting with s = 0,_**  
+$$s_n = 0 + b_n = b_n \\s_{n-1} = s_nx_0 + b_{n-1} \\s_{n-2} = s_{n-1}x_0 + b_{n-2} \\.\\.\\.\\s_0 = s_1x_0 + b_0$$
+**_Iteratively substituting_** $s_i, i = n,(n-1),(n-2),...,0$,**_in the p(x) equation, we get_** $p(x_0) = s_0$.
+**_In short, we can write the mathematical expression as: for_** $i = n, (n-1), (n-2),...,0, \\s_i = b_i$ **_and_** $s_{i-1} = s_ix + b_{i-1}$.
+
+1.(b) Use horner to plot $p(x) = 2 - 4x - x^2/2 + x^3$ for $x \in [-3,3]$. (Hint: check the code in the next problem, or see curve in R.)
+```{r}
+c <- c(2,-4,-1/2,1)
+curve(horner(c)(x), from = -3, to = 3)
+```
+
+1.(c) Implement Newton’s method to find the roots of p from the previous item. 
+```{r}
+#horner function for evaluating polynomial
+horner <- function (coef)
+function (x) {
+s <- 0
+for (i in seq(length(coef), 1, -1)){
+s <- s * x + coef[i]
+}
+s
+}
+
+#horner function for evaluating the derivative of polynomial
+dhorner <- function(coef)
+function(x){
+s <- 0
+for (i in seq(length(coef), 2, -1)){
+  s <- s*x + (i-1)*coef[i]
+  }
+  s
+}
+
+#Newton's method for finding the roots of the polynomial
+newton <- function(x){
+  p <- x
+  m <- p - horner(coef)(p)/dhorner(coef)(p)
+  while (abs(p-m) > 1e-12) {
+    p <- m
+    m <- p - horner(coef)(p)/dhorner(coef)(p)
+  }
+  print(p)
+}
+coef <- c(2,-4,-1/2,1)
+newton(-1.5)
+newton(0)
+newton(1.5)
+```
+**_Starting from x = -1 gives an error._**
+
+
+1.(d) Legendre polynomial
+```{r, include=FALSE}
+legendre <- function(n){
+  M <- matrix(0, nrow = n+1, ncol = n+1)
+  M1 <- matrix(0, nrow = n+1, ncol = n+1)
+  #When n = 0, M[1,1]=1
+  M[1,1] <- 1
+  M[2,1:2] <- c(0,1)
+    for (i in 2:n) {
+      M1 <- append(M[i,], values = 0, after = 0)
+      M[i+1,] <- ((2*i + 1)*M1[-(n+2)] - (i-1)*M[i-1,])/i
+    }
+  return(M[n,])
+}
+legendre(4)
+```
+
+2.(a)creating the tableau T
+```{r}
+#creating a vandermonde matrix of predictors
+T <- matrix(0,6,6)
+x <- c(-3.0, -2.5, -2.0, -1.5, -1.0, -0.5, 0.0, 0.5, 1.0, 1.5, 2.0, 2.5, 3.0)
+X <- outer(x, 0:4, FUN = "^")
+
+#creating the tableau T
+y <- c(-17.0, -7.0, 0.5, 3.0, 5.0, 4.0, 2.5, -0.5, -2.0, -2.0, 0.5, 5.0, 12.0)
+T[1:5,1:5] <- crossprod(X,X)
+T[1:5,6] <- crossprod(X,y)
+T[6,1:5] <- crossprod(y,X)
+T[6,6] <- crossprod(y,y)
+T
+
+```
+
+2.(b)
+```{r}
+SWEEP <- function(T, k){
+  n <- nrow(T)
+  D <- T[k,k]
+  T[k,] <- T[k,]/D
+  for (i in 1:n) {
+    if (i != k){
+      B <- T[i,k]
+      T[i,] <- T[i,] - B*T[k,]
+      T[i,k] <- (-1)*B/D
+    }
+  }
+  T[k,k] <- 1/D
+  return(T)
+}
+
+for (i in 1:5) {
+  T <- SWEEP(T,i)
+}
+T
+```
+
+**_#Quick Check: SWEEP(SWEEP(T, k), k) returns the original tableau T._**
+```{r}
+#Quick Check:
+for (i in 1:5) {
+SWEEP(SWEEP(T, i), i)
+}
+T
+```
+
+2.(c)
+```{r}
+T <- matrix(0,6,6)
+x <- c(-3.0, -2.5, -2.0, -1.5, -1.0, -0.5, 0.0, 0.5, 1.0, 1.5, 2.0, 2.5, 3.0)
+X <- outer(x, 0:4, FUN = "^")
+
+#creating the tableau T
+y <- c(-17.0, -7.0, 0.5, 3.0, 5.0, 4.0, 2.5, -0.5, -2.0, -2.0, 0.5, 5.0, 12.0)
+T[1:5,1:5] <- crossprod(X,X)
+T[1:5,6] <- crossprod(X,y)
+T[6,1:5] <- crossprod(y,X)
+T[6,6] <- crossprod(y,y)
+T
+plot(x, y)
+a <- seq(-3, 3, length.out = 100)
+p <- ncol(T) - 1
+for (k in 1:4) {
+T <- SWEEP(T, k)
+lines(a, horner(T[1:k, p + 1])(a), lty = k)
+print(c(k, T[p + 1, p + 1]))
+}
+```
+**_For each k, the regression line with degree k for_** $y = \sum\limits_{i = 0}^n\beta_ix^i$ **_is getting plotted. For k=1, it is a straight line. For k=2, it is a linear regression line. For k=3, it is a parabola and for k=4, it is a curve._**
+**_The T[p+1,p+1] element is the RSS. Therefore, for each k, the RSS is being printed._**
+
+3.(a)Inverse Schur Complement
+```{r}
+P <- matrix(c(4,5,3,1),2,2) 
+Q <- matrix(c(3,5,4,7,2,1),2,3)
+R <- matrix(c(1,8,6,4,3,2),3,2)
+S <- matrix(c(1,3,4,2,5,6,1,9,5),3,3)
+
+K <- rbind(cbind(P, Q), cbind(R,S))
+solve(K)
+
+#inverse Schur complement
+S1 <- K[3:5,3:5] - K[3:5,1:2]%*%solve(K[1:2,1:2])%*%K[1:2,3:5]
+solve(S1)
+
+for (k in 1:2) {
+  K <- SWEEP(K,k)
+}
+K
+
+for (k in 3:5) {
+ K <- SWEEP(K,k) 
+}
+K #The yy block of K is equal to the inverse Schur complement
+```
